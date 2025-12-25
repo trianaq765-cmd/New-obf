@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lua Obfuscator - Advanced Protection</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-dark">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1">
+                <i class="fas fa-shield-alt"></i> Lua Obfuscator Pro
+            </span>
+            <div class="d-flex">
+                <a href="/docs" class="btn btn-outline-light btn-sm me-2">
+                    <i class="fas fa-book"></i> Docs
+                </a>
+                <a href="/api-docs" class="btn btn-outline-light btn-sm">
+                    <i class="fas fa-code"></i> API
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-5">
+        <div class="row">
+            <div class="col-lg-8 mx-auto">
+                <div class="text-center mb-5">
+                    <h1 class="display-4 fw-bold">
+                        <i class="fas fa-lock text-primary"></i> Advanced Lua Obfuscator
+                    </h1>
+                    <p class="lead text-muted">
+                        Military-grade obfuscation with VM virtualization, AES-256 encryption, and anti-reverse engineering
+                    </p>
+                </div>
+
+                <!-- Obfuscation Form -->
+                <div class="card shadow-lg">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-code"></i> Obfuscate Your Code</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="obfuscateForm">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Select Method:</label>
+                                <div class="btn-group w-100" role="group">
+                                    <input type="radio" class="btn-check" name="inputMethod" id="fileMethod" value="file" checked>
+                                    <label class="btn btn-outline-primary" for="fileMethod">
+                                        <i class="fas fa-file-upload"></i> Upload File
+                                    </label>
+                                    
+                                    <input type="radio" class="btn-check" name="inputMethod" id="textMethod" value="text">
+                                    <label class="btn btn-outline-primary" for="textMethod">
+                                        <i class="fas fa-edit"></i> Paste Code
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- File Upload -->
+                            <div id="fileInput" class="mb-3">
+                                <label for="luaFile" class="form-label">Upload Lua File:</label>
+                                <input type="file" class="form-control" id="luaFile" accept=".lua,.txt">
+                                <small class="text-muted">Max size: 5MB</small>
+                            </div>
+
+                            <!-- Text Input -->
+                            <div id="textInput" class="mb-3" style="display: none;">
+                                <label for="luaCode" class="form-label">Paste Lua Code:</label>
+                                <textarea class="form-control font-monospace" id="luaCode" rows="10" placeholder="-- Your Lua code here..."></textarea>
+                            </div>
+
+                            <!-- Preset Selection -->
+                            <div class="mb-3">
+                                <label for="preset" class="form-label fw-bold">Obfuscation Preset:</label>
+                                <select class="form-select" id="preset">
+                                    <option value="low">🟢 Low - Fast (Basic Protection)</option>
+                                    <option value="medium" selected>🟡 Medium - Balanced (Recommended)</option>
+                                    <option value="high">🟠 High - Strong Protection</option>
+                                    <option value="extreme">🔴 Extreme - Maximum Security</option>
+                                </select>
+                            </div>
+
+                            <!-- Advanced Options -->
+                            <div class="accordion mb-3" id="advancedOptions">
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header">
+                                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAdvanced">
+                                            <i class="fas fa-cog me-2"></i> Advanced Options
+                                        </button>
+                                    </h2>
+                                    <div id="collapseAdvanced" class="accordion-collapse collapse" data-bs-parent="#advancedOptions">
+                                        <div class="accordion-body">
+                                            <div class="form-check form-switch mb-2">
+                                                <input class="form-check-input" type="checkbox" id="vmEnabled" checked>
+                                                <label class="form-check-label" for="vmEnabled">
+                                                    VM Virtualization
+                                                </label>
+                                            </div>
+                                            <div class="form-check form-switch mb-2">
+                                                <input class="form-check-input" type="checkbox" id="antiDebug" checked>
+                                                <label class="form-check-label" for="antiDebug">
+                                                    Anti-Debug Protection
+                                                </label>
+                                            </div>
+                                            <div class="form-check form-switch mb-2">
+                                                <input class="form-check-input" type="checkbox" id="antiTamper" checked>
+                                                <label class="form-check-label" for="antiTamper">
+                                                    Anti-Tamper
+                                                </label>
+                                            </div>
+                                            <div class="form-check form-switch mb-2">
+                                                <input class="form-check-input" type="checkbox" id="antiDump" checked>
+                                                <label class="form-check-label" for="antiDump">
+                                                    Anti-Dump
+                                                </label>
+                                            </div>
+                                            <div class="form-check form-switch mb-2">
+                                                <input class="form-check-input" type="checkbox" id="stringEncryption" checked>
+                                                <label class="form-check-label" for="stringEncryption">
+                                                    String Encryption
+                                                </label>
+                                            </div>
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" id="controlFlow" checked>
+                                                <label class="form-check-label" for="controlFlow">
+                                                    Control Flow Obfuscation
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary btn-lg w-100" id="obfuscateBtn">
+                                <i class="fas fa-lock"></i> Obfuscate Now
+                            </button>
+                        </form>
+
+                        <!-- Progress -->
+                        <div id="progress" class="mt-3" style="display: none;">
+                            <div class="progress">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                     role="progressbar" style="width: 100%">
+                                    Processing...
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Result -->
+                        <div id="result" class="mt-4" style="display: none;">
+                            <div class="alert alert-success">
+                                <h5><i class="fas fa-check-circle"></i> Obfuscation Complete!</h5>
+                                <div id="stats" class="mt-3"></div>
+                            </div>
+                            <div class="d-grid gap-2">
+                                <button class="btn btn-success" id="downloadBtn">
+                                    <i class="fas fa-download"></i> Download Obfuscated File
+                                </button>
+                                <button class="btn btn-outline-secondary" id="copyBtn">
+                                    <i class="fas fa-copy"></i> Copy to Clipboard
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Error -->
+                        <div id="error" class="alert alert-danger mt-3" style="display: none;">
+                            <i class="fas fa-exclamation-triangle"></i> <span id="errorMessage"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Features -->
+                <div class="row mt-5">
+                    <div class="col-md-4 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body text-center">
+                                <i class="fas fa-microchip fa-3x text-primary mb-3"></i>
+                                <h5>Custom VM</h5>
+                                <p class="text-muted small">Real virtual machine implementation with custom opcodes</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body text-center">
+                                <i class="fas fa-shield-alt fa-3x text-success mb-3"></i>
+                                <h5>Multi-Layer Security</h5>
+                                <p class="text-muted small">AES-256, Anti-Debug, Anti-Tamper, Anti-Dump protection</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body text-center">
+                                <i class="fas fa-gamepad fa-3x text-danger mb-3"></i>
+                                <h5>Roblox Compatible</h5>
+                                <p class="text-muted small">Works with all major executors and loadstring</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="bg-dark text-white text-center py-3 mt-5">
+        <p class="mb-0">Advanced Lua Obfuscator v2.0 | Made with ❤️</p>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/js/main.js"></script>
+</body>
+</html>
