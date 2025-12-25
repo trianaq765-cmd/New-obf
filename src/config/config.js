@@ -1,11 +1,12 @@
 module.exports = {
     // Discord Configuration
     discord: {
-        token: process.env.DISCORD_TOKEN,
-        clientId: process.env.DISCORD_CLIENT_ID,
-        guildId: process.env.DISCORD_GUILD_ID,
+        token: process.env.DISCORD_TOKEN || null,
+        clientId: process.env.DISCORD_CLIENT_ID || null,
+        guildId: process.env.DISCORD_GUILD_ID || null,
         prefix: process.env.PREFIX || '!',
         maxFileSize: 5 * 1024 * 1024, // 5MB
+        enabled: Boolean(process.env.DISCORD_TOKEN && process.env.DISCORD_CLIENT_ID),
     },
     
     // Web Server Configuration
@@ -18,7 +19,7 @@ module.exports = {
     
     // Database Configuration
     database: {
-        uri: process.env.MONGODB_URI || 'mongodb://localhost:27017/obfuscator',
+        uri: process.env.MONGODB_URI || null,
         options: {
             useNewUrlParser: true,
             useUnifiedTopology: true,
@@ -27,19 +28,19 @@ module.exports = {
     
     // Security Configuration
     security: {
-        jwtSecret: process.env.JWT_SECRET || 'your-secret-key-change-this',
+        jwtSecret: process.env.JWT_SECRET || 'default-secret-change-this-in-production',
         jwtExpiration: '7d',
         bcryptRounds: 12,
         maxRequestsPerMinute: 10,
-        sessionSecret: process.env.SESSION_SECRET || 'session-secret-change-this',
+        sessionSecret: process.env.SESSION_SECRET || 'session-secret-change-this-in-production',
     },
     
-    // Obfuscator Configuration (Luraph-style)
+    // ... rest of config stays the same
     obfuscator: {
         features: {
             vm: {
                 enabled: true,
-                complexity: 'high', // low, medium, high, extreme
+                complexity: 'high',
                 customOpcodes: true,
                 registerShuffling: true,
                 instructionMutation: true,
@@ -48,7 +49,7 @@ module.exports = {
                 aes256: true,
                 xor: true,
                 customCipher: true,
-                layered: true, // Multi-layer encryption
+                layered: true,
             },
             antiTamper: {
                 enabled: true,
@@ -71,7 +72,7 @@ module.exports = {
             },
             stringEncryption: {
                 enabled: true,
-                algorithm: 'aes256', // xor, aes256, custom
+                algorithm: 'aes256',
                 pooling: true,
                 encoding: true,
             },
@@ -88,12 +89,12 @@ module.exports = {
             },
             variableRenaming: {
                 enabled: true,
-                algorithm: 'mangled', // simple, mangled, hexadecimal
+                algorithm: 'mangled',
                 preserveGlobals: false,
             },
             junkCode: {
                 enabled: true,
-                density: 5, // 1-10
+                density: 5,
                 realistic: true,
             },
             deadCode: {
@@ -109,45 +110,33 @@ module.exports = {
             },
         },
         
-        // Luraph-specific features
         luraphFeatures: {
-            // Virtualization
             vmObfuscation: true,
-            nestedVirtualization: true, // VM inside VM
-            hybridExecution: true, // Mix native + VM
-            
-            // Advanced encryption
-            polyglotEncryption: true, // Multiple encryption methods
+            nestedVirtualization: true,
+            hybridExecution: true,
+            polyglotEncryption: true,
             keyDerivation: true,
             saltedEncryption: true,
-            
-            // Code mutation
             instructionSubstitution: true,
             patternRandomization: true,
             semanticObfuscation: true,
-            
-            // Anti-analysis
             antiStaticAnalysis: true,
             antiDynamicAnalysis: true,
             antiPatternMatching: true,
-            
-            // Protection layers
-            multiLayerProtection: 3, // Number of protection layers
+            multiLayerProtection: 3,
             watermarking: true,
-            fingerprintBinding: false, // Bind to hardware (advanced)
+            fingerprintBinding: false,
         }
     },
     
-    // Rate Limiting
     rateLimit: {
-        windowMs: 15 * 60 * 1000, // 15 minutes
-        max: 100, // Max requests per windowMs
+        windowMs: 15 * 60 * 1000,
+        max: 100,
         skipSuccessfulRequests: false,
     },
     
-    // File Upload
     upload: {
-        maxFileSize: 5 * 1024 * 1024, // 5MB
+        maxFileSize: 5 * 1024 * 1024,
         allowedExtensions: ['.lua', '.txt'],
         tempDir: './temp',
     },
