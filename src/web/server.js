@@ -3,7 +3,6 @@ const helmet = require('helmet');
 const cors = require('cors');
 const compression = require('compression');
 const session = require('express-session');
-const MongoStore = require('connect-mongo');
 const path = require('path');
 const config = require('../config/config');
 const logger = require('../utils/logger');
@@ -41,21 +40,36 @@ class WebServer {
         this.app.use(express.json({ limit: '10mb' }));
         this.app.use(express.urlencoded({ extended: true, limit: '10mb' }));
         
-        // Session
-        this.app.use(session({
-            secret: config.security.sessionSecret,
-            resave: false,
-            saveUninitialized: false,
-            store: MongoStore.create({
-                mongoUrl: config.database.uri,
-                touchAfter: 24 * 3600
-            }),
-            cookie: {
-                secure: process.env.NODE_ENV === 'production',
-                httpOnly: true,
-                maxAge: 1000 * 60 * 60 * 24 * 7 // 7 days
-            }
-        }));
+        // Session (without MongoDB if not configured)
+        if (config.database.uri) {
+            const MongoStore = require('connect-mongo');
+            this.app.use(session({
+                secret: config.security.sessionSecret,
+                resave: false,
+                saveUninitialized: false,
+                store: MongoStore.create({
+                    mongoUrl: config.database.uri,
+                    touchAfter: 24 * 3600
+                }),
+                cookie: {
+                    secure: process.env.NODE_ENV === 'production',
+                    httpOnly: true,
+                    maxAge: 1000 * 60 * 60 * 24 * 7
+                }
+            }));
+        } else {
+            // Use memory store if MongoDB not configured
+            this.app.use(session({
+                secret: config.security.sessionSecret,
+                resave: false,
+                saveUninitialized: false,
+                cookie: {
+                    secure: process.env.NODE_ENV === 'production',
+                    httpOnly: true,
+                    maxAge: 1000 * 60 * 60 * 24 * 7
+                }
+            }));
+        }
         
         // Static files
         this.app.use(express.static(path.join(__dirname, '../../public')));
@@ -80,8 +94,13 @@ class WebServer {
         
         // Health check
         this.app.get('/health', (req, res) => {
+            const discordBot = require('../bot');
             res.json({ 
-                status: 'ok', 
+                status: 'ok',
+                services: {
+                    web: 'running',
+                    discord: discordBot.isReady ? 'connected' : 'disabled'
+                },
                 timestamp: new Date().toISOString(),
                 uptime: process.uptime()
             });
@@ -108,7 +127,7 @@ class WebServer {
                     logger.error('Failed to start web server:', err);
                     reject(err);
                 } else {
-                    logger.info(`Web server running on ${config.web.host}:${config.web.port}`);
+                    logger.info(`🌐 Web server running on ${config.web.host}:${config.web.port}`);
                     resolve();
                 }
             });
