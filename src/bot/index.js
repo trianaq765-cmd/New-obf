@@ -16,8 +16,7 @@ class DiscordBot {
         });
         
         this.client.commands = new Collection();
-        this.loadCommands();
-        this.loadEvents();
+        this.isReady = false;
     }
     
     loadCommands() {
@@ -51,6 +50,17 @@ class DiscordBot {
     }
     
     async registerCommands() {
+        // Validate configuration first
+        if (!config.discord.token) {
+            logger.warn('Discord token not configured. Skipping command registration.');
+            return false;
+        }
+        
+        if (!config.discord.clientId) {
+            logger.warn('Discord client ID not configured. Skipping command registration.');
+            return false;
+        }
+        
         const commands = [];
         const commandFiles = fs.readdirSync(path.join(__dirname, 'commands'))
             .filter(file => file.endsWith('.js'));
@@ -64,26 +74,69 @@ class DiscordBot {
         
         try {
             logger.info('Registering slash commands...');
+            logger.info(`Using Client ID: ${config.discord.clientId}`);
             
+            // Get application info to verify
+            const app = await rest.get(Routes.oauth2CurrentApplication());
+            logger.info(`Bot application: ${app.name} (${app.id})`);
+            
+            // Register commands
             await rest.put(
                 Routes.applicationCommands(config.discord.clientId),
                 { body: commands }
             );
             
             logger.info('Successfully registered slash commands');
+            return true;
+            
         } catch (error) {
-            logger.error('Error registering commands:', error);
+            logger.error('Error registering commands:', error.message);
+            
+            if (error.code === 10002) {
+                logger.error('❌ DISCORD_CLIENT_ID is invalid or does not match your bot token!');
+                logger.error('📝 How to fix:');
+                logger.error('1. Go to https://discord.com/developers/applications');
+                logger.error('2. Select your bot application');
+                logger.error('3. Copy the "Application ID" from General Information');
+                logger.error('4. Set it as DISCORD_CLIENT_ID in your environment variables');
+                logger.error(`5. Your bot token starts with: ${config.discord.token.substring(0, 20)}...`);
+            }
+            
+            return false;
         }
     }
     
     async start() {
         try {
+            // Check if Discord is configured
+            if (!config.discord.token) {
+                logger.warn('⚠️  Discord bot token not configured. Discord bot will not start.');
+                logger.warn('The web service will continue to run without Discord integration.');
+                return false;
+            }
+            
+            this.loadCommands();
+            this.loadEvents();
+            
+            // Try to register commands (but don't fail if it errors)
             await this.registerCommands();
+            
+            // Login to Discord
             await this.client.login(config.discord.token);
-            logger.info('Discord bot logged in successfully');
+            this.isReady = true;
+            logger.info('✅ Discord bot logged in successfully');
+            return true;
+            
         } catch (error) {
-            logger.error('Failed to start Discord bot:', error);
-            throw error;
+            logger.error('❌ Failed to start Discord bot:', error.message);
+            
+            if (error.message.includes('TOKEN_INVALID')) {
+                logger.error('Your Discord bot token is invalid!');
+                logger.error('Get a valid token from: https://discord.com/developers/applications');
+            }
+            
+            logger.warn('⚠️  Continuing without Discord bot...');
+            return false;
         }
     }
 }
