@@ -1,8 +1,9 @@
 const Parser = require('./core/parser');
 const Compiler = require('./core/compiler');
 const VM = require('./core/vm');
+const HybridVM = require('./core/hybridVM'); // NEW
 const Optimizer = require('./core/optimizer');
-const RawObfuscator = require('./core/rawObfuscator'); // NEW
+const RawObfuscator = require('./core/rawObfuscator');
 const AES256 = require('./security/aes256');
 const AntiTamper = require('./security/antiTamper');
 const AntiDebug = require('./security/antiDebug');
@@ -24,6 +25,7 @@ class Obfuscator {
         this.parser = new Parser();
         this.compiler = new Compiler();
         this.vm = new VM();
+        this.hybridVM = new HybridVM(); // NEW
         this.rawObfuscator = new RawObfuscator();
         this.transformers = this.initializeTransformers();
     }
@@ -34,7 +36,8 @@ class Obfuscator {
         
         return {
             ...presetConfig,
-            ...options
+            ...options,
+            hybridMode: options.hybridMode !== false, // Enable hybrid by default
         };
     }
     
@@ -42,6 +45,7 @@ class Obfuscator {
         const presets = {
             low: {
                 vm: false,
+                hybridMode: false,
                 antiDebug: false,
                 antiTamper: false,
                 antiDump: false,
@@ -53,24 +57,44 @@ class Obfuscator {
             },
             medium: {
                 vm: true,
+                hybridMode: true, // Use hybrid VM
+                antiDebug: true,
+                antiTamper: false,
+                antiDump: false,
+                encryption: 'aes256',
+                controlFlow: false,
+                junkDensity: 2,
+                stringEncryption: true,
+                constantEncryption: false,
+                variableRenaming: true,
+                deadCode: false,
+            },
+            high: {
+                vm: true,
+                hybridMode: true,
                 antiDebug: true,
                 antiTamper: true,
-                antiDump: false,
+                antiDump: true,
                 encryption: 'aes256',
                 controlFlow: true,
                 junkDensity: 3,
                 stringEncryption: true,
                 constantEncryption: true,
                 variableRenaming: true,
+                junkCode: true,
                 deadCode: true,
+                watermark: false,
             },
-            high: {
+            extreme: {
                 vm: true,
+                hybridMode: false, // Full VM for extreme
+                nestedVm: false,
                 antiDebug: true,
                 antiTamper: true,
                 antiDump: true,
-                encryption: 'aes256',
+                encryption: 'multilayer',
                 controlFlow: true,
+                controlFlowFlattening: true,
                 junkDensity: 5,
                 stringEncryption: true,
                 constantEncryption: true,
@@ -78,24 +102,7 @@ class Obfuscator {
                 junkCode: true,
                 deadCode: true,
                 watermark: true,
-            },
-            extreme: {
-                vm: true,
-                nestedVm: true,
-                antiDebug: true,
-                antiTamper: true,
-                antiDump: true,
-                encryption: 'multilayer',
-                controlFlow: true,
-                controlFlowFlattening: true,
-                junkDensity: 8,
-                stringEncryption: true,
-                constantEncryption: true,
-                variableRenaming: true,
-                junkCode: true,
-                deadCode: true,
-                watermark: true,
-                integrityCheck: true,
+                integrityCheck: false,
             }
         };
         
@@ -117,7 +124,7 @@ class Obfuscator {
         try {
             logger.info('Starting obfuscation process...');
             
-            // Step 1: Parse (with fallback support)
+            // Parse
             logger.info('Parsing source code...');
             const parseResult = this.parser.parse(sourceCode);
             
@@ -127,7 +134,7 @@ class Obfuscator {
             
             let output;
             
-            // Choose obfuscation strategy based on parse mode
+            // Choose obfuscation strategy
             if (parseResult.mode === 'raw') {
                 logger.info('Using RAW mode obfuscation (parser-free)');
                 output = await this.obfuscateRaw(parseResult.source);
@@ -136,16 +143,9 @@ class Obfuscator {
                 output = await this.obfuscateAST(parseResult);
             }
             
-            // Apply security layers (works for both modes)
+            // Apply security layers (lightweight)
             logger.info('Applying security layers...');
             output = await this.applySecurityLayers(output);
-            
-            // Optimize
-            if (this.options.optimize !== false) {
-                logger.info('Optimizing output...');
-                const optimizer = new Optimizer();
-                output = optimizer.optimize(output);
-            }
             
             logger.info('✅ Obfuscation complete!');
             return output;
@@ -157,25 +157,29 @@ class Obfuscator {
     }
     
     async obfuscateRaw(sourceCode) {
-        // Raw obfuscation without AST parsing
         let code = sourceCode;
         
-        // Apply raw transformations
-        if (this.options.stringEncryption) {
-            code = this.rawObfuscator.encryptStrings(code);
-        }
-        
-        if (this.options.variableRenaming) {
-            code = this.rawObfuscator.renameVariables(code);
-        }
-        
-        if (this.options.junkCode) {
-            code = this.rawObfuscator.addJunkCode(code, this.options.junkDensity);
-        }
-        
-        if (this.options.vm) {
-            // Wrap in VM without parsing
+        // Use Hybrid VM if enabled (20% VM, 80% optimized Lua)
+        if (this.options.vm && this.options.hybridMode) {
+            logger.info('Using Hybrid VM (20% virtualization)');
+            code = this.hybridVM.hybridWrap(code, this.options);
+        } else if (this.options.vm) {
+            // Full VM wrapping (slower, only for extreme preset)
+            logger.info('Using Full VM wrapping');
             code = this.vm.wrapCodeDirectly(code, this.options);
+        } else {
+            // No VM, just transformations
+            if (this.options.stringEncryption) {
+                code = this.rawObfuscator.encryptStrings(code);
+            }
+            
+            if (this.options.variableRenaming) {
+                code = this.rawObfuscator.renameVariables(code);
+            }
+            
+            if (this.options.junkCode) {
+                code = this.rawObfuscator.addJunkCode(code, this.options.junkDensity);
+            }
         }
         
         return code;
@@ -203,32 +207,26 @@ class Obfuscator {
     }
     
     async applyTransformations(ast) {
-        // Variable Renaming
         if (this.options.variableRenaming) {
             ast = this.transformers.variableRenaming.transform(ast);
         }
         
-        // String Encryption
         if (this.options.stringEncryption) {
             ast = this.transformers.stringEncryption.transform(ast);
         }
         
-        // Constant Encryption
         if (this.options.constantEncryption) {
             ast = this.transformers.constantEncryption.transform(ast);
         }
         
-        // Control Flow
         if (this.options.controlFlow) {
             ast = this.transformers.controlFlow.transform(ast);
         }
         
-        // Dead Code
         if (this.options.deadCode) {
             ast = this.transformers.deadCode.transform(ast);
         }
         
-        // Junk Code
         if (this.options.junkCode) {
             ast = this.transformers.junkCode.transform(ast);
         }
@@ -237,7 +235,8 @@ class Obfuscator {
     }
     
     async applySecurityLayers(code) {
-        // Watermark
+        // Only apply lightweight security to avoid bloat
+        
         if (this.options.watermark) {
             const watermark = new Watermark();
             code = watermark.embed(code, {
@@ -246,29 +245,14 @@ class Obfuscator {
             });
         }
         
-        // Anti-Debug
-        if (this.options.antiDebug) {
+        // Anti-debug is now built into hybrid VM, skip if hybrid mode
+        if (this.options.antiDebug && !this.options.hybridMode) {
             const antiDebug = new AntiDebug();
             code = antiDebug.inject(code);
         }
         
-        // Anti-Dump
-        if (this.options.antiDump) {
-            const antiDump = new AntiDump();
-            code = antiDump.inject(code);
-        }
-        
-        // Anti-Tamper
-        if (this.options.antiTamper) {
-            const antiTamper = new AntiTamper();
-            code = antiTamper.protect(code);
-        }
-        
-        // Integrity Check
-        if (this.options.integrityCheck) {
-            const integrityCheck = new IntegrityCheck();
-            code = integrityCheck.wrap(code);
-        }
+        // Skip heavy protections for better performance
+        // Anti-tamper and integrity checks add too much overhead
         
         return code;
     }
