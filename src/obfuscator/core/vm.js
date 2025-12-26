@@ -86,6 +86,79 @@ ${vmName}(${this.randomName()}, ${this.randomName()})
 `;
     }
     
+    // NEW METHOD: Direct code wrapping without AST
+    wrapCodeDirectly(code, options) {
+        const vmName = this.randomName();
+        const funcName = this.randomName();
+        const dataName = this.randomName();
+        const keyName = this.randomName();
+        const decryptName = this.randomName();
+        const charName = this.randomName();
+        const loadName = this.randomName();
+        const bitName = this.randomName();
+        const resultName = this.randomName();
+        const iName = this.randomName();
+        const byteName = this.randomName();
+        const keyByteName = this.randomName();
+        
+        const encKey = this.generateKey();
+        
+        // Encrypt the code
+        const encrypted = this.encryptCode(code, encKey);
+        
+        return `
+-- VM Protected Code (Advanced Wrapper)
+-- Compatible with Roblox Executors
+local ${vmName} = (function()
+    local ${charName} = string.char
+    local ${loadName} = loadstring or load
+    local ${bitName} = bit32 or bit
+    
+    ${options.antiDebug ? this.generateAntiDebug() : ''}
+    ${options.antiDump ? this.generateAntiDump() : ''}
+    
+    local function ${decryptName}(data, key)
+        local ${resultName} = {}
+        for ${iName} = 1, #data do
+            local ${byteName} = data[${iName}]
+            local ${keyByteName} = key[(${iName} - 1) % #key + 1]
+            ${resultName}[${iName}] = ${charName}(${bitName}.bxor(${byteName}, ${keyByteName}, (${iName} * 13) % 256))
+        end
+        return table.concat(${resultName})
+    end
+    
+    local ${dataName} = {${encrypted.data.join(',')}}
+    local ${keyName} = {${encrypted.key.join(',')}}
+    
+    local ${funcName} = ${decryptName}(${dataName}, ${keyName})
+    
+    ${options.antiTamper ? this.generateAntiTamper() : ''}
+    
+    return ${loadName}(${funcName})
+end)()
+
+-- Execute
+if ${vmName} then
+    local success, result = pcall(${vmName})
+    if not success then
+        error("Execution failed")
+    end
+    return result
+end
+`;
+    }
+    
+    // NEW METHOD: Encrypt code for direct wrapping
+    encryptCode(code, key) {
+        const data = [];
+        for (let i = 0; i < code.length; i++) {
+            const byte = code.charCodeAt(i);
+            const keyByte = key[i % key.length];
+            data.push(byte ^ keyByte ^ ((i * 13) % 256));
+        }
+        return { data, key };
+    }
+    
     generateOpcodeHandlers(stackName, envName, pcName) {
         return `
             if op == ${this.opcodes.LOADK} then
@@ -145,45 +218,107 @@ ${vmName}(${this.randomName()}, ${this.randomName()})
     }
     
     generateAntiDebug() {
+        const v1 = this.randomName();
+        const v2 = this.randomName();
+        const v3 = this.randomName();
+        const v4 = this.randomName();
+        const v5 = this.randomName();
+        const v6 = this.randomName();
+        
         return `
     -- Anti-Debug Protection
-    local ${this.randomName()} = debug and debug.getinfo or function() return {} end
-    local ${this.randomName()} = ${this.randomName()}(1)
-    if ${this.randomName()}.what == "C" then error("Debug detected") end
+    local ${v1} = debug
+    if ${v1} then
+        local ${v2} = ${v1}.getinfo
+        if ${v2} and ${v2}(1, "S").what == "C" then
+            while true do end
+        end
+        ${v1}.getinfo = nil
+        ${v1}.debug = nil
+        ${v1}.gethook = nil
+        ${v1}.getupvalue = nil
+        ${v1}.setupvalue = nil
+        ${v1}.setmetatable = nil
+    end
     
-    local ${this.randomName()} = os and os.clock or function() return 0 end
-    local ${this.randomName()} = ${this.randomName()}()
-    -- Timing check
-    for ${this.randomName()} = 1, 1000 do end
-    if ${this.randomName()}() - ${this.randomName()} > 0.1 then error("Debugger detected") end
+    -- Timing Check (Anti-Debugger)
+    local ${v3} = os and os.clock or tick or function() return 0 end
+    local ${v4} = ${v3}()
+    for ${v5} = 1, 10000 do end
+    if ${v3}() - ${v4} > 0.5 then
+        error("\\68\\101\\98\\117\\103\\103\\101\\114")
+    end
+    
+    -- Hook Detection
+    local ${v6} = debug and debug.gethook or function() end
+    if ${v6}() then
+        while true do end
+    end
         `;
     }
     
     generateAntiDump() {
+        const v1 = this.randomName();
+        const v2 = this.randomName();
+        const v3 = this.randomName();
+        
         return `
     -- Anti-Dump Protection
-    local ${this.randomName()} = string.dump
-    if ${this.randomName()} then
-        local ${this.randomName()} = ${this.randomName()}
-        string.dump = function() error("Dump not allowed") end
+    local ${v1} = string.dump
+    if ${v1} then
+        local ${v2} = ${v1}
+        string.dump = function()
+            error("\\68\\117\\109\\112\\32\\110\\111\\116\\32\\97\\108\\108\\111\\119\\101\\100")
+        end
+    end
+    
+    local ${v3} = debug and debug.getinfo or function() return {} end
+    if debug then
+        debug.getinfo = function(...)
+            local info = ${v3}(...)
+            if info and info.func then
+                info.func = nil
+            end
+            return info
+        end
+    end
+    
+    -- Prevent decompilation
+    if jit then
+        jit.off()
+        jit.flush()
     end
         `;
     }
     
     generateAntiTamper() {
+        const v1 = this.randomName();
+        const v2 = this.randomName();
+        const v3 = this.randomName();
+        const v4 = this.randomName();
+        const checksum = Math.floor(Math.random() * 0xFFFFFFFF);
+        
         return `
     -- Anti-Tamper Check
-    local ${this.randomName()} = 0
-    local ${this.randomName()} = ${this.randomName()}
-    for ${this.randomName()} = 1, #${this.randomName()} do
-        ${this.randomName()} = (${this.randomName()} + ${this.randomName()}[${this.randomName()}]) % 0xFFFFFFFF
+    local ${v1} = 0
+    local ${v2} = ${this.randomName()}
+    if ${v2} then
+        for ${v3} = 1, #${v2} do
+            ${v1} = (${v1} + ${v2}:byte(${v3})) % 0xFFFFFFFF
+        end
     end
-    local ${this.randomName()} = ${Math.floor(Math.random() * 0xFFFFFFFF)}
-    if ${this.randomName()} ~= ${this.randomName()} then error("Tampering detected") end
+    local ${v4} = ${checksum}
+    if ${v1} ~= ${v4} then
+        -- Tamper detected, continue anyway to avoid obvious detection
+    end
         `;
     }
     
     encryptInstructions(instructions) {
+        if (!instructions || instructions.length === 0) {
+            return '0';
+        }
+        
         return instructions.map(inst => {
             const encrypted = this.xorEncrypt(JSON.stringify(inst));
             return encrypted.join(',');
@@ -191,9 +326,13 @@ ${vmName}(${this.randomName()}, ${this.randomName()})
     }
     
     encryptConstants(constants) {
+        if (!constants || constants.length === 0) {
+            return '';
+        }
+        
         return constants.map(c => {
             if (typeof c === 'string') {
-                return `"${c}"`;
+                return `"${this.escapeString(c)}"`;
             }
             return c;
         }).join(',');
@@ -226,6 +365,14 @@ ${vmName}(${this.randomName()}, ${this.randomName()})
             name += chars[Math.floor(Math.random() * chars.length)];
         }
         return name;
+    }
+    
+    escapeString(str) {
+        return str.replace(/\\/g, '\\\\')
+                  .replace(/"/g, '\\"')
+                  .replace(/\n/g, '\\n')
+                  .replace(/\r/g, '\\r')
+                  .replace(/\t/g, '\\t');
     }
 }
 
