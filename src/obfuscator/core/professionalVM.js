@@ -1,110 +1,86 @@
 class ProfessionalVM {
     constructor() {
-        this.minifyLevel = 'extreme';
+        this.compressionEnabled = true;
     }
     
-    /**
-     * Generate professional obfuscated output (Luraph-style)
-     * Clean, compact, no ugly comments
-     */
     wrap(code, options) {
-        // Pre-process: extract and encrypt resources
         const processed = this.preprocessCode(code);
-        
-        // Generate VM runtime (compact and professional)
-        const vm = this.generateVM(processed, options);
-        
-        // Post-process: extreme minification
-        return this.postProcess(vm);
+        const vm = this.generateProfessionalVM(processed, options);
+        return vm;
     }
     
     preprocessCode(code) {
-        // Extract strings
         const strings = [];
         const stringMap = new Map();
-        let stringId = 0;
+        let sid = 0;
         
-        const codeWithStringPlaceholders = code.replace(/(['"`])(?:(?=(\\?))\2.)*?\1/g, (match) => {
-            const content = match.slice(1, -1);
+        const withStrings = code.replace(/(['"`])(?:(?=(\\?))\2.)*?\1/g, (m) => {
+            const content = m.slice(1, -1);
             if (content.length > 2) {
                 if (!stringMap.has(content)) {
                     strings.push(content);
-                    stringMap.set(content, stringId++);
+                    stringMap.set(content, sid++);
                 }
-                return `__STR_${stringMap.get(content)}__`;
+                return `__S${stringMap.get(content)}__`;
             }
-            return match;
+            return m;
         });
         
-        // Extract numbers
         const numbers = [];
         const numberMap = new Map();
-        let numberId = 0;
+        let nid = 0;
         
-        const codeWithNumPlaceholders = codeWithStringPlaceholders.replace(/\b(\d+\.?\d*)\b/g, (match) => {
-            const num = parseFloat(match);
-            if (num > 99 || num < -99) {
-                if (!numberMap.has(num)) {
-                    numbers.push(num);
-                    numberMap.set(num, numberId++);
+        const withNumbers = withStrings.replace(/\b(\d+\.?\d*)\b/g, (m) => {
+            const n = parseFloat(m);
+            if (Math.abs(n) > 100) {
+                if (!numberMap.has(n)) {
+                    numbers.push(n);
+                    numberMap.set(n, nid++);
                 }
-                return `__NUM_${numberMap.get(num)}__`;
+                return `__N${numberMap.get(n)}__`;
             }
-            return match;
+            return m;
         });
         
-        return {
-            code: codeWithNumPlaceholders,
-            strings,
-            numbers
-        };
+        return { code: withNumbers, strings, numbers };
     }
     
-    generateVM(processed, options) {
+    generateProfessionalVM(processed, options) {
         const { code, strings, numbers } = processed;
-        
-        // Encrypt the main code
         const encrypted = this.encrypt(code);
+        const v = this.genVars(25);
         
-        // Generate variable names (short and obfuscated)
-        const v = this.generateVars(30);
-        
-        // Build VM (ultra compact, single line where possible)
         let vm = `(function()`;
         
         // String pool
         if (strings.length > 0) {
             vm += `local ${v[0]}={`;
-            vm += strings.map(s => this.encryptString(s)).join(',');
+            vm += strings.map(s => this.encStr(s)).join(',');
             vm += `};`;
         }
         
         // Number pool
         if (numbers.length > 0) {
-            vm += `local ${v[1]}={`;
-            vm += numbers.map(n => this.obfuscateNumber(n)).join(',');
-            vm += `};`;
+            vm += `local ${v[1]}={${numbers.join(',')}};`;
         }
         
-        // Decryption function (compact)
+        // Decryptor
         vm += `local function ${v[2]}(${v[3]},${v[4]})`;
         vm += `local ${v[5]}={};`;
         vm += `for ${v[6]}=1,#${v[3]} do `;
-        vm += `${v[5]}[${v[6]}]=string.char(bit32.bxor(${v[3]}[${v[6]}],${v[4]}[(${v[6]}-1)%#${v[4]}+1]));`;
+        vm += `${v[5]}[${v[6]}]=string.char(bit32.bxor(${v[3]}[${v[6]}],${v[4]}[(${v[6]}-1)%#${v[4]}+1],(${v[6]}*7)%256));`;
         vm += `end;`;
         vm += `return table.concat(${v[5]})`;
         vm += `end;`;
         
-        // Encrypted data
+        // Data
         vm += `local ${v[7]}={${encrypted.data.join(',')}};`;
         vm += `local ${v[8]}={${encrypted.key.join(',')}};`;
-        
-        // Decrypt and restore
         vm += `local ${v[9]}=${v[2]}(${v[7]},${v[8]});`;
         
-        // String restoration
+        // String restore
         if (strings.length > 0) {
-            vm += `${v[9]}=${v[9]}:gsub("__STR_(%d+)__",function(${v[10]})`;
+            vm += `${v[9]}=${v[9]}:gsub("__S(%d+)__",function(${v[10]})`;
             vm += `local ${v[11]}=${v[0]}[tonumber(${v[10]})+1];`;
             vm += `local ${v[12]}={};`;
             vm += `for ${v[13]}=1,#${v[11]} do `;
@@ -114,9 +90,9 @@ class ProfessionalVM {
             vm += `end);`;
         }
         
-        // Number restoration
+        // Number restore
         if (numbers.length > 0) {
-            vm += `${v[9]}=${v[9]}:gsub("__NUM_(%d+)__",function(${v[14]})return tostring(${v[1]}[tonumber(${v[14]})+1])end);`;
+            vm += `${v[9]}=${v[9]}:gsub("__N(%d+)__",function(${v[14]})return tostring(${v[1]}[tonumber(${v[14]})+1])end);`;
         }
         
         // Execute
@@ -127,76 +103,43 @@ class ProfessionalVM {
     }
     
     encrypt(code) {
-        const key = this.generateKey(16);
+        const key = this.genKey(16);
         const data = [];
-        
         for (let i = 0; i < code.length; i++) {
             data.push(code.charCodeAt(i) ^ key[i % key.length] ^ ((i * 7) % 256));
         }
-        
         return { data, key };
     }
     
-    encryptString(str) {
-        const key = Math.floor(Math.random() * 200) + 50;
-        const encrypted = [];
-        
+    encStr(str) {
+        const k = Math.floor(Math.random() * 200) + 50;
+        const e = [];
         for (let i = 0; i < str.length; i++) {
-            encrypted.push(str.charCodeAt(i) ^ key);
+            e.push(str.charCodeAt(i) ^ k);
         }
-        encrypted.push(key); // Key at end
-        
-        return `{${encrypted.join(',')}}`;
+        e.push(k);
+        return `{${e.join(',')}}`;
     }
     
-    obfuscateNumber(num) {
-        const methods = [
-            () => num,
-            () => `(${num + 1000}-1000)`,
-            () => `(${num * 2}/2)`,
-            () => `bit32.bxor(${num},0)`,
-        ];
-        
-        return methods[Math.floor(Math.random() * methods.length)]();
-    }
-    
-    postProcess(code) {
-        // Extreme minification
-        return code
-            // Remove all comments
-            .replace(/--\[\[[\s\S]*?\]\]/g, '')
-            .replace(/--[^\n]*/g, '')
-            // Remove all unnecessary whitespace
-            .replace(/\s+/g, ' ')
-            // Remove spaces around operators
-            .replace(/\s*([=+\-*/%^#<>~(){}[\],;:.])\s*/g, '$1')
-            // Remove newlines
-            .replace(/\n+/g, '')
-            // Final trim
-            .trim();
-    }
-    
-    generateVars(count) {
-        const vars = [];
-        const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
-        
-        for (let i = 0; i < count; i++) {
+    genVars(n) {
+        const v = [];
+        const c = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        for (let i = 0; i < n; i++) {
             let name = '_';
             for (let j = 0; j < 4; j++) {
-                name += chars[Math.floor(Math.random() * chars.length)];
+                name += c[Math.floor(Math.random() * c.length)];
             }
-            vars.push(name);
+            v.push(name);
         }
-        
-        return vars;
+        return v;
     }
     
-    generateKey(length) {
-        const key = [];
-        for (let i = 0; i < length; i++) {
-            key.push(Math.floor(Math.random() * 256));
+    genKey(len) {
+        const k = [];
+        for (let i = 0; i < len; i++) {
+            k.push(Math.floor(Math.random() * 256));
         }
-        return key;
+        return k;
     }
 }
 
