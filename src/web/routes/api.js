@@ -1,5 +1,39 @@
-// Update the obfuscate endpoint error handling
+const express = require('express');
+const router = express.Router();
+const multer = require('multer');
+const rateLimit = require('express-rate-limit');
+const Obfuscator = require('../../obfuscator');
+const logger = require('../../utils/logger');
+const config = require('../../config/config');
 
+// Rate limiting
+const apiLimiter = rateLimit({
+    windowMs: config.rateLimit.windowMs,
+    max: config.rateLimit.max,
+    message: { error: 'Too many requests, please try again later.' }
+});
+
+// File upload configuration
+const storage = multer.memoryStorage();
+const upload = multer({
+    storage: storage,
+    limits: {
+        fileSize: config.upload.maxFileSize
+    },
+    fileFilter: (req, file, cb) => {
+        const ext = file.originalname.toLowerCase();
+        if (ext.endsWith('.lua') || ext.endsWith('.txt')) {
+            cb(null, true);
+        } else {
+            cb(new Error('Only .lua and .txt files are allowed'));
+        }
+    }
+});
+
+// Apply rate limiting to all API routes
+router.use(apiLimiter);
+
+// Obfuscate endpoint
 router.post('/obfuscate', upload.single('file'), async (req, res) => {
     try {
         let sourceCode;
@@ -56,7 +90,6 @@ router.post('/obfuscate', upload.single('file'), async (req, res) => {
                     compressionRatio: ((obfuscated.length / sourceCode.length) * 100).toFixed(2) + '%',
                     duration: duration + 'ms',
                     preset: options.preset,
-                    mode: 'auto', // Will show 'raw' or 'ast' in logs
                 },
                 features: options
             });
@@ -71,7 +104,7 @@ router.post('/obfuscate', upload.single('file'), async (req, res) => {
             let suggestion = '';
             
             if (errorMessage.includes('parse')) {
-                suggestion = 'The Lua code may have syntax errors. Try using "raw" mode or fix syntax issues.';
+                suggestion = 'The Lua code may have syntax errors. The system uses fallback mode for complex code.';
             } else if (errorMessage.includes('Invalid')) {
                 suggestion = 'Please ensure your Lua code is valid and complete.';
             }
@@ -79,7 +112,7 @@ router.post('/obfuscate', upload.single('file'), async (req, res) => {
             res.status(400).json({ 
                 error: errorMessage,
                 suggestion: suggestion,
-                tip: 'For already obfuscated code, the system automatically uses raw mode which works without parsing.'
+                tip: 'For already obfuscated code, the system automatically uses raw mode.'
             });
         }
         
@@ -90,3 +123,116 @@ router.post('/obfuscate', upload.single('file'), async (req, res) => {
         });
     }
 });
+
+// Obfuscate with custom settings
+router.post('/obfuscate/custom', upload.single('file'), async (req, res) => {
+    try {
+        let sourceCode;
+        
+        if (req.file) {
+            sourceCode = req.file.buffer.toString('utf-8');
+        } else if (req.body.code) {
+            sourceCode = req.body.code;
+        } else {
+            return res.status(400).json({ error: 'No source code provided' });
+        }
+        
+        // Custom settings
+        const customSettings = req.body.settings ? JSON.parse(req.body.settings) : {};
+        
+        const obfuscator = new Obfuscator(customSettings);
+        const startTime = Date.now();
+        const obfuscated = await obfuscator.obfuscate(sourceCode);
+        const duration = Date.now() - startTime;
+        
+        res.json({
+            success: true,
+            code: obfuscated,
+            statistics: {
+                originalSize: sourceCode.length,
+                obfuscatedSize: obfuscated.length,
+                duration: duration + 'ms',
+            }
+        });
+        
+    } catch (error) {
+        logger.error('Custom obfuscation error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get presets
+router.get('/presets', (req, res) => {
+    res.json({
+        presets: {
+            low: {
+                name: 'Low',
+                description: 'Fast obfuscation with basic protection',
+                features: {
+                    vm: false,
+                    encryption: 'xor',
+                    controlFlow: false,
+                    junkDensity: 1
+                }
+            },
+            medium: {
+                name: 'Medium',
+                description: 'Balanced protection and performance',
+                features: {
+                    vm: true,
+                    encryption: 'aes256',
+                    controlFlow: true,
+                    junkDensity: 3
+                }
+            },
+            high: {
+                name: 'High',
+                description: 'Strong protection with good performance',
+                features: {
+                    vm: true,
+                    encryption: 'aes256',
+                    controlFlow: true,
+                    antiDebug: true,
+                    antiTamper: true,
+                    junkDensity: 5
+                }
+            },
+            extreme: {
+                name: 'Extreme',
+                description: 'Maximum security (slower performance)',
+                features: {
+                    vm: true,
+                    nestedVm: true,
+                    encryption: 'multilayer',
+                    controlFlow: true,
+                    antiDebug: true,
+                    antiTamper: true,
+                    antiDump: true,
+                    junkDensity: 8
+                }
+            }
+        }
+    });
+});
+
+// Statistics endpoint
+router.get('/stats', (req, res) => {
+    res.json({
+        totalObfuscations: 0,
+        totalUsers: 0,
+        averageSize: '0 KB',
+        uptime: Math.floor(process.uptime()),
+        status: 'online'
+    });
+});
+
+// Health check
+router.get('/health', (req, res) => {
+    res.json({
+        status: 'ok',
+        service: 'api',
+        timestamp: new Date().toISOString()
+    });
+});
+
+module.exports = router;
