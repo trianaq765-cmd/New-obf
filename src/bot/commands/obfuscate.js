@@ -1,65 +1,36 @@
-const { SlashCommandBuilder, AttachmentBuilder } = require('discord.js');
-const Obfuscator = require('../../obfuscator');
-const logger = require('../../utils/logger');
-const axios = require('axios');
+// Update the execute function with better error handling
 
-module.exports = {
-    data: new SlashCommandBuilder()
-        .setName('obfuscate')
-        .setDescription('Obfuscate a Lua script')
-        .addAttachmentOption(option =>
-            option.setName('file')
-                .setDescription('Lua file to obfuscate')
-                .setRequired(true))
-        .addStringOption(option =>
-            option.setName('preset')
-                .setDescription('Obfuscation preset')
-                .setRequired(false)
-                .addChoices(
-                    { name: 'Low (Fast)', value: 'low' },
-                    { name: 'Medium (Balanced)', value: 'medium' },
-                    { name: 'High (Secure)', value: 'high' },
-                    { name: 'Extreme (Maximum Security)', value: 'extreme' }
-                ))
-        .addBooleanOption(option =>
-            option.setName('vm')
-                .setDescription('Enable VM virtualization')
-                .setRequired(false))
-        .addBooleanOption(option =>
-            option.setName('antidebug')
-                .setDescription('Enable anti-debug protection')
-                .setRequired(false)),
-    
-    async execute(interaction) {
+async execute(interaction) {
+    try {
+        await interaction.deferReply({ ephemeral: true });
+        
+        const attachment = interaction.options.getAttachment('file');
+        const preset = interaction.options.getString('preset') || 'medium';
+        const enableVM = interaction.options.getBoolean('vm') ?? true;
+        const enableAntiDebug = interaction.options.getBoolean('antidebug') ?? true;
+        
+        // Validate file
+        if (!attachment.name.endsWith('.lua') && !attachment.name.endsWith('.txt')) {
+            return await interaction.editReply({
+                content: '❌ Invalid file type. Please upload a .lua or .txt file.',
+                ephemeral: true
+            });
+        }
+        
+        if (attachment.size > 5 * 1024 * 1024) {
+            return await interaction.editReply({
+                content: '❌ File too large. Maximum size is 5MB.',
+                ephemeral: true
+            });
+        }
+        
+        // Download file
+        logger.info(`Obfuscating file: ${attachment.name} for user ${interaction.user.tag}`);
+        const response = await axios.get(attachment.url);
+        const sourceCode = response.data;
+        
+        // Obfuscate with error handling
         try {
-            await interaction.deferReply({ ephemeral: true });
-            
-            const attachment = interaction.options.getAttachment('file');
-            const preset = interaction.options.getString('preset') || 'medium';
-            const enableVM = interaction.options.getBoolean('vm') ?? true;
-            const enableAntiDebug = interaction.options.getBoolean('antidebug') ?? true;
-            
-            // Validate file
-            if (!attachment.name.endsWith('.lua') && !attachment.name.endsWith('.txt')) {
-                return await interaction.editReply({
-                    content: '❌ Invalid file type. Please upload a .lua or .txt file.',
-                    ephemeral: true
-                });
-            }
-            
-            if (attachment.size > 5 * 1024 * 1024) {
-                return await interaction.editReply({
-                    content: '❌ File too large. Maximum size is 5MB.',
-                    ephemeral: true
-                });
-            }
-            
-            // Download file
-            logger.info(`Obfuscating file: ${attachment.name} for user ${interaction.user.tag}`);
-            const response = await axios.get(attachment.url);
-            const sourceCode = response.data;
-            
-            // Obfuscate
             const obfuscator = new Obfuscator({
                 preset: preset,
                 vm: enableVM,
@@ -102,13 +73,12 @@ module.exports = {
 🔐 **Features Applied:**
 ${enableVM ? '• ✅ VM Virtualization' : '• ❌ VM Virtualization'}
 ${enableAntiDebug ? '• ✅ Anti-Debug Protection' : '• ❌ Anti-Debug Protection'}
-• ✅ AES-256 Encryption
-• ✅ Anti-Tamper
 • ✅ String Encryption
-• ✅ Control Flow Obfuscation
+• ✅ Anti-Tamper
 • ✅ Variable Renaming
 
 📥 **Your obfuscated file is attached below.**
+✨ **Compatible with all Roblox executors!**
             `;
             
             await interaction.editReply({
@@ -119,12 +89,34 @@ ${enableAntiDebug ? '• ✅ Anti-Debug Protection' : '• ❌ Anti-Debug Protec
             
             logger.info(`Successfully obfuscated ${attachment.name} in ${duration}ms`);
             
-        } catch (error) {
-            logger.error('Error during obfuscation:', error);
+        } catch (obfError) {
+            logger.error('Obfuscation error:', obfError);
+            
+            let errorMsg = `❌ **Obfuscation Failed**\n\n`;
+            errorMsg += `Error: \`${obfError.message}\`\n\n`;
+            
+            if (obfError.message.includes('parse')) {
+                errorMsg += `💡 **Tip:** Your code may have syntax issues. `;
+                errorMsg += `The obfuscator uses advanced parsing but works best with valid Lua syntax.\n\n`;
+                errorMsg += `Try:\n`;
+                errorMsg += `• Check your Lua syntax\n`;
+                errorMsg += `• Remove any syntax errors\n`;
+                errorMsg += `• Use a lower preset (Low or Medium)`;
+            } else {
+                errorMsg += `💡 **Tip:** Try using a different preset or check your code syntax.`;
+            }
+            
             await interaction.editReply({
-                content: `❌ Error during obfuscation: ${error.message}`,
+                content: errorMsg,
                 ephemeral: true
             });
         }
+        
+    } catch (error) {
+        logger.error('Command execution error:', error);
+        await interaction.editReply({
+            content: `❌ Unexpected error: ${error.message}`,
+            ephemeral: true
+        });
     }
-};
+}
