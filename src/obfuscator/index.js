@@ -2,6 +2,7 @@ const Parser = require('./core/parser');
 const Compiler = require('./core/compiler');
 const VM = require('./core/vm');
 const Optimizer = require('./core/optimizer');
+const RawObfuscator = require('./core/rawObfuscator'); // NEW
 const AES256 = require('./security/aes256');
 const AntiTamper = require('./security/antiTamper');
 const AntiDebug = require('./security/antiDebug');
@@ -23,6 +24,7 @@ class Obfuscator {
         this.parser = new Parser();
         this.compiler = new Compiler();
         this.vm = new VM();
+        this.rawObfuscator = new RawObfuscator();
         this.transformers = this.initializeTransformers();
     }
     
@@ -115,43 +117,89 @@ class Obfuscator {
         try {
             logger.info('Starting obfuscation process...');
             
-            // Step 1: Parse
+            // Step 1: Parse (with fallback support)
             logger.info('Parsing source code...');
-            let ast = this.parser.parse(sourceCode);
+            const parseResult = this.parser.parse(sourceCode);
             
-            // Step 2: Transform AST
-            logger.info('Applying transformations...');
-            ast = await this.applyTransformations(ast);
-            
-            // Step 3: Compile to VM instructions (if VM enabled)
-            let output;
-            if (this.options.vm) {
-                logger.info('Compiling to VM instructions...');
-                const instructions = this.compiler.compile(ast);
-                output = this.vm.generateRuntime(instructions, this.options);
-            } else {
-                logger.info('Generating obfuscated code...');
-                output = this.compiler.generateCode(ast);
+            if (!this.parser.validate(parseResult)) {
+                throw new Error('Invalid Lua syntax');
             }
             
-            // Step 4: Apply security layers
+            let output;
+            
+            // Choose obfuscation strategy based on parse mode
+            if (parseResult.mode === 'raw') {
+                logger.info('Using RAW mode obfuscation (parser-free)');
+                output = await this.obfuscateRaw(parseResult.source);
+            } else {
+                logger.info('Using AST mode obfuscation');
+                output = await this.obfuscateAST(parseResult);
+            }
+            
+            // Apply security layers (works for both modes)
             logger.info('Applying security layers...');
             output = await this.applySecurityLayers(output);
             
-            // Step 5: Optimize
+            // Optimize
             if (this.options.optimize !== false) {
                 logger.info('Optimizing output...');
                 const optimizer = new Optimizer();
                 output = optimizer.optimize(output);
             }
             
-            logger.info('Obfuscation complete!');
+            logger.info('✅ Obfuscation complete!');
             return output;
             
         } catch (error) {
             logger.error('Obfuscation failed:', error);
             throw new Error('Obfuscation failed: ' + error.message);
         }
+    }
+    
+    async obfuscateRaw(sourceCode) {
+        // Raw obfuscation without AST parsing
+        let code = sourceCode;
+        
+        // Apply raw transformations
+        if (this.options.stringEncryption) {
+            code = this.rawObfuscator.encryptStrings(code);
+        }
+        
+        if (this.options.variableRenaming) {
+            code = this.rawObfuscator.renameVariables(code);
+        }
+        
+        if (this.options.junkCode) {
+            code = this.rawObfuscator.addJunkCode(code, this.options.junkDensity);
+        }
+        
+        if (this.options.vm) {
+            // Wrap in VM without parsing
+            code = this.vm.wrapCodeDirectly(code, this.options);
+        }
+        
+        return code;
+    }
+    
+    async obfuscateAST(parseResult) {
+        let ast = parseResult.ast;
+        
+        // Transform AST
+        logger.info('Applying transformations...');
+        ast = await this.applyTransformations(ast);
+        
+        // Compile
+        let output;
+        if (this.options.vm) {
+            logger.info('Compiling to VM instructions...');
+            const instructions = this.compiler.compile(ast);
+            output = this.vm.generateRuntime(instructions, this.options);
+        } else {
+            logger.info('Generating obfuscated code...');
+            output = this.compiler.generateCode(ast);
+        }
+        
+        return output;
     }
     
     async applyTransformations(ast) {
