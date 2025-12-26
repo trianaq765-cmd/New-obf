@@ -10,7 +10,6 @@ class RawObfuscator {
         const stringPattern = /(['"])(?:(?=(\\?))\2.)*?\1/g;
         const strings = [];
         
-        // Extract all strings
         let match;
         while ((match = stringPattern.exec(code)) !== null) {
             strings.push({
@@ -22,17 +21,15 @@ class RawObfuscator {
         
         if (strings.length === 0) return code;
         
-        // Generate decryptor
         const decryptorName = this.randomVar('STR');
-        let decryptor = `\nlocal ${decryptorName}=(function()`;
-        decryptor += `local ${this.randomVar('a')}=string.char;`;
-        decryptor += `local ${this.randomVar('b')}=table.concat;`;
-        decryptor += `local ${this.randomVar('c')}={`;
+        let decryptor = `local ${decryptorName}=(function()`;
+        decryptor += `local ${this.randomVar('c')}=string.char;`;
+        decryptor += `local ${this.randomVar('b')}=bit32 or bit;`;
+        decryptor += `local ${this.randomVar('p')}={`;
         
         const encryptedStrings = [];
         const replacements = [];
         
-        // Encrypt each string
         strings.forEach((str, idx) => {
             const encrypted = this.xorEncrypt(str.content);
             encryptedStrings.push(`{${encrypted.data.join(',')},${encrypted.key}}`);
@@ -45,16 +42,15 @@ class RawObfuscator {
         decryptor += encryptedStrings.join(',');
         decryptor += `};`;
         decryptor += `return function(${this.randomVar('i')})`;
-        decryptor += `local ${this.randomVar('e')}=${this.randomVar('c')}[${this.randomVar('i')}+1];`;
+        decryptor += `local ${this.randomVar('e')}=${this.randomVar('p')}[${this.randomVar('i')}+1];`;
         decryptor += `local ${this.randomVar('r')}={};`;
         decryptor += `for ${this.randomVar('j')}=1,#${this.randomVar('e')}-1 do `;
         decryptor += `${this.randomVar('r')}[${this.randomVar('j')}]=`;
-        decryptor += `${this.randomVar('a')}(bit32.bxor(${this.randomVar('e')}[${this.randomVar('j')}],${this.randomVar('e')}[#${this.randomVar('e')}]))`;
+        decryptor += `${this.randomVar('c')}(${this.randomVar('b')}.bxor(${this.randomVar('e')}[${this.randomVar('j')}],${this.randomVar('e')}[#${this.randomVar('e')}]))`;
         decryptor += ` end;`;
-        decryptor += `return ${this.randomVar('b')}(${this.randomVar('r')})`;
-        decryptor += ` end end)();\n`;
+        decryptor += `return table.concat(${this.randomVar('r')})`;
+        decryptor += ` end end)();`;
         
-        // Replace strings in reverse order to maintain indices
         let result = code;
         for (let i = replacements.length - 1; i >= 0; i--) {
             result = result.replace(replacements[i].original, replacements[i].replacement);
@@ -64,26 +60,21 @@ class RawObfuscator {
     }
     
     renameVariables(code) {
-        // Find local variable declarations
         const localPattern = /\blocal\s+([a-zA-Z_][a-zA-Z0-9_]*)/g;
         const variables = new Set();
         
         let match;
         while ((match = localPattern.exec(code)) !== null) {
             const varName = match[1];
-            // Don't rename Lua keywords or common globals
             if (!this.isReserved(varName)) {
                 variables.add(varName);
             }
         }
         
-        // Generate replacements
         let result = code;
         variables.forEach(varName => {
             const newName = this.randomVar('V');
             this.variableMap.set(varName, newName);
-            
-            // Replace with word boundaries
             const regex = new RegExp(`\\b${varName}\\b`, 'g');
             result = result.replace(regex, newName);
         });
@@ -91,16 +82,36 @@ class RawObfuscator {
         return result;
     }
     
+    encryptConstants(code) {
+        return code.replace(/\b(\d+\.?\d*)\b/g, (match) => {
+            const num = parseFloat(match);
+            if (Math.abs(num) > 100) {
+                const methods = [
+                    `(${num + 1000}-1000)`,
+                    `(${num * 2}/2)`,
+                    `bit32.bxor(${num},0)`,
+                    `(function()return ${num} end)()`,
+                ];
+                return methods[Math.floor(Math.random() * methods.length)];
+            }
+            return match;
+        });
+    }
+    
     addJunkCode(code, density) {
-        const lines = code.split('\n');
         const junkLines = [];
-        
         for (let i = 0; i < density; i++) {
             junkLines.push(this.generateJunkLine());
         }
-        
-        // Insert junk at beginning
-        return junkLines.join('\n') + '\n' + code;
+        return junkLines.join('') + code;
+    }
+    
+    addDeadCode(code) {
+        const deadFuncs = [];
+        for (let i = 0; i < 3; i++) {
+            deadFuncs.push(this.generateDeadFunction());
+        }
+        return deadFuncs.join('') + code;
     }
     
     generateJunkLine() {
@@ -112,10 +123,14 @@ class RawObfuscator {
                 const v2 = this.randomVar('J');
                 return `local ${v1},${v2}=${Math.random()},${Math.random()};`;
             },
-            () => `if ${Math.random() > 0.5} then end;`,
         ];
-        
         return patterns[Math.floor(Math.random() * patterns.length)]();
+    }
+    
+    generateDeadFunction() {
+        const fn = this.randomVar('DF');
+        const p = this.randomVar('p');
+        return `local function ${fn}(${p})return ${p}*2 end;`;
     }
     
     xorEncrypt(str) {
@@ -130,7 +145,7 @@ class RawObfuscator {
     randomVar(prefix = 'V') {
         const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
         let name = '_' + prefix + '_';
-        for (let i = 0; i < 8; i++) {
+        for (let i = 0; i < 6; i++) {
             name += chars[Math.floor(Math.random() * chars.length)];
         }
         return name;
@@ -150,13 +165,11 @@ class RawObfuscator {
             'and', 'break', 'do', 'else', 'elseif', 'end', 'false', 'for',
             'function', 'if', 'in', 'local', 'nil', 'not', 'or', 'repeat',
             'return', 'then', 'true', 'until', 'while',
-            // Common globals
             'print', 'table', 'string', 'math', 'game', 'workspace', 'script',
             '_G', 'shared', 'getfenv', 'setfenv', 'loadstring', 'require',
             'pairs', 'ipairs', 'next', 'pcall', 'xpcall', 'type', 'tostring',
             'tonumber', 'select', 'unpack', 'error', 'assert'
         ];
-        
         return reserved.includes(name);
     }
 }
